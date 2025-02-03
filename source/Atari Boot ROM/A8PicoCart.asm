@@ -2,7 +2,7 @@
  * by Robin Edwards/Electrotrains@AtariAge
  * This file builds with WUDSN/MADS into an 8K Atari ROM
  * The 8k ROM should be converted into a C include file using:
- *  xxd -i A8PicoCart.ROM > rom.h
+ *  xxd -i A8PicoCart.rom > rom.h
  */
 
 /*
@@ -33,7 +33,7 @@ DIR_START_ROW = 7
 DIR_END_ROW = 21
 ITEMS_PER_PAGE = DIR_END_ROW-DIR_START_ROW+1
 
-;@com.wudsn.ide.asm.outputfileextension=.rom
+;@com.wudsn.ide.lng.outputfileextension=.rom
 
 ;CARTCS	= $bffa                    ;Start address vector, used if CARTFG has CARTFG_START_CART bit set
 ;CART	= $bffc                    ;Flag, must be zero for modules
@@ -204,15 +204,22 @@ start   .proc
 	lda ColPM2
 	cmp #1
 	beq pal_cols
-ntsc_cols
-	mva #$6F COLOR1
-	mva #$62 COLOR2
+ntsc_cols               ; NTSC colors 
+	lda #$38        ; Logo base
+	ldx #$7F        ; Forground/bright
+	ldy #$72        ; Background/dark
 	jmp patch_boot
-pal_cols
-	mva #$4F COLOR1
-	mva #$42 COLOR2
+pal_cols                ; PAL colors
+	ldy #$28        ; Logo base
+	ldx #$4F        ; Forground/bright
+	ldy #$42        ; Background/dark
 
 patch_boot	
+	sta COLOR0
+	stx COLOR1
+	sty COLOR2
+	
+
 	mva #3 BOOT ; patch reset - from mapping the atari (revised) appendix 11
 	mwa #reset_routine CASINI
 	
@@ -846,24 +853,30 @@ NoKey
 	.endp
 
 .proc	display_boot_screen
+p1	= $a0
+
+	mwa #dl SDLSTL
+
+;	mva #0 text_out_x
+;	mva #0 text_out_y
+;	mwa #menu_text1 text_out_ptr
+;	mva #(.len menu_text1) text_out_len
+;	jsr output_text_internal
+;	inc text_out_y
+;	mwa #menu_text2 text_out_ptr
+;	mva #(.len menu_text2) text_out_len
+;	jsr output_text_internal
+;	inc text_out_y
+;	mwa #menu_text3 text_out_ptr
+;	mva #(.len menu_text3) text_out_len
+;	jsr output_text_internal
+;	inc text_out_y
+;	mwa #menu_text4 text_out_ptr
+;	mva #(.len menu_text4) text_out_len
+;	jsr output_text_internal
+;	inc text_out_y
 	mva #0 text_out_x
-	mva #0 text_out_y
-	mwa #menu_text1 text_out_ptr
-	mva #(.len menu_text1) text_out_len
-	jsr output_text_internal
-	inc text_out_y
-	mwa #menu_text2 text_out_ptr
-	mva #(.len menu_text2) text_out_len
-	jsr output_text_internal
-	inc text_out_y
-	mwa #menu_text3 text_out_ptr
-	mva #(.len menu_text3) text_out_len
-	jsr output_text_internal
-	inc text_out_y
-	mwa #menu_text4 text_out_ptr
-	mva #(.len menu_text4) text_out_len
-	jsr output_text_internal
-	inc text_out_y
+	mva #4 text_out_y
 	mwa #menu_text5 text_out_ptr
 	mva #(.len menu_text5) text_out_len
 	jsr output_text_internal
@@ -872,6 +885,17 @@ NoKey
 	mva #(.len menu_text_bottom) text_out_len
 	jsr output_text_inverted
 	rts
+
+	.local dl
+	.byte $70,$70,$70
+	.byte $4e,a(logo_sm)
+:31	.byte $0e
+	.byte $42,a($9c40+4*40)
+:19	.byte $02
+	.byte $41,a(dl)
+	.endl
+
+logo_sm	ins "Logo.pic"
 	.endp
 
 .proc	output_header_text
@@ -1089,19 +1113,31 @@ Loop
 
 ; ************************ DATA ****************************
 	.local menu_text1
-	.byte "   _   ___ ___ _       ___          _   "
+	.byte "  .+%@@%+.  =+*+*+=. :+@@*::+@@*:"
 	.endl
 	.local menu_text2
-	.byte "  /_\ ( _ ) _ (_)__ _ / __|__ _ _ _| |_ "
+	.byte "     -%@@@#-  -***#*+.  =%@%=.=#@%+."
 	.endl
 	.local menu_text3
-	.byte " / _ \/ _ \  _/ / _/_\ (__/ _' | '_|  _|"
+	.byte "  ..  *@@@@@=  +@.@+@-   *@@@@--@@@@:"
 	.endl
 	.local menu_text4
-	.byte "/_/ \_\___/_| |_\__\_/\___\__,_|_|  \__|"
+	.byte "=@@@#. .=@-.   +@ .:@-   ##..*-#%:-@#= "
 	.endl
 	.local menu_text5
-	.byte "                      Electrotrains 2023"
+	.byte "#@@@@%: -@.    +@  .@-   #*    ##  @++@:"
+	.endl
+	.local menu_text6
+	.byte "=%@@@@- -@.   .#@.#=@*   #*  =:#% .@++@*"
+	.endl
+	.local menu_text7
+	.byte "  :*@@- -@. -*@%=.@=+@%+:#@%@@=+@@@@+#@*"
+	.endl
+	.local menu_text8
+	.byte "    .=#*-+-:=++-:-+-:-++=-++++-:+++++@*."
+	.endl
+	.local menu_text5
+	.byte "A8PICOCART            Electrotrains 2023"
 	.endl
 	.local menu_text_bottom
 	.byte 'CurUp/Dn/Retn=Sel B=Back X=Boot Esc=Find'
@@ -1307,7 +1343,7 @@ BufIndex	equ *-2
 	ldy #0
 	sta (IOPtr),y
 	inw IOPtr
-	dew BLen
+.nowarn	dew BLen
 	
 	ldx #3		; y is already 0
 	sec
@@ -1489,4 +1525,5 @@ LoaderCodeSize	= EndLoaderCode-LoaderCode
         .byte 0                   ;CART
         .byte CARTFG_START_CART   ;CARTFG
         .word init                ;CARTAD
+
 
